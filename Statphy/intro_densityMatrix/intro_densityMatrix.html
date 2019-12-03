@@ -899,6 +899,56 @@ probability that particle in the box in the position of x
 
 
 <p><img src="intro_densityMatrix_files/intro_densityMatrix_6_0.png" alt="png" /></p>
+<h3>Convolution relation</h3>
+<p>Convolution relation or matrix squaring is practical approach to compute density matrix at any temperature, from high limit temperature.</p>
+<p>Hamiltonian of quantum system</p>
+<p class="math">\[
+H = H_0 + V
+\]</p>
+<p>in the limit of high temperature the density matrix is expressed by Trotter formula</p>
+<p class="math">\[
+\rho(x,x',\beta) \rightarrow \lim_{\beta\rightarrow 0} e^{-\frac{1}{2}\beta V(x)}\rho_0(x,x',\beta) e^{-\frac{1}{2}\beta V(x')}
+\]</p>
+<hr />
+<p><strong>Trotter Formula</strong></p>
+<p>In mathematics, Trotter formula or Lie product formula statess that</p>
+<p class="math">\[
+e^{A+B} = \lim_{N\rightarrow \infty}(e^{A/N}e^{B/N})^N
+\]</p>
+<p>where <span class="math">$A$</span> and <span class="math">$B$</span> are arbitrary <span class="math">$n \times n$</span> real or complex matrices.</p>
+<p>Therefore, for hamiltonian above it gives</p>
+<p class="math">\[
+e^{-\beta (H_0+V)} = \lim_{N\rightarrow \infty}(e^{-\beta/N H_0}e^{-\beta/N V})^N
+\]</p>
+<hr />
+<p>The elegant property is of density matrix is the convolution relation, where it relates the high temperature to their lower temperature</p>
+<p class="math">\[
+\int dx' \; \rho(x,x',\beta_1)\rho(x',x'',\beta_2) = \int dx' \sum_{n,m} \psi_n(x) e^{-\beta_1 E_n} \psi_n^*(x') \psi_m(x') e^{-\beta_2 E_m}\psi_m^*(x'')  \\
+= \sum_{n,m}  \psi_n(x) e^{-\beta_1 E_n} \left(\int dx'\psi_n^*(x') \psi_m(x') \right) e^{-\beta_2 E_m}\psi_m^*(x'') = \sum_{n,m} \psi_n(x) e^{-\beta_1 E_n} \delta_{n,m} e^{-\beta_2 E_m}\psi_m^*(x'') \\
+= \sum_{n} \psi_n(x) e^{-(\beta_1+\beta_2) E_n}\psi_m^*(x'') = \rho(x,x'',\beta_1 + \beta_2)
+\]</p>
+<p>in matrix representation</p>
+<p class="math">\[
+\sum_l \rho_{kl}(\beta_1) \rho_{lm}(\beta_2) = [\rho(\beta_1)\rho(\beta_2)]_{km} = \rho_{km}(\beta_1+\beta_2)
+\]</p>
+<p>this is the product of matrix.</p>
+<h3>Relation to statistical mechanics</h3>
+<p>We can formulate the relation in term of differential relation</p>
+<p class="math">\[
+\rho(\Delta\beta)\rho(\beta) = \rho(\beta + \Delta\beta)
+\]</p>
+<p>because <span class="math">$\rho(\Delta\beta) \approx 1 - \Delta\beta H$</span>, then</p>
+<p class="math">\[
+\rho(\beta + \Delta\beta) = \rho(\beta) - \Delta\beta H \rho(\beta)
+\]</p>
+<p>we arrived at the central equation of quantum statistical mechanics</p>
+<p class="math">\[
+-H\rho = \frac{\rho(\beta + \Delta\beta) - \rho(\beta)}{\Delta\beta} = \frac{\partial}{\partial \beta}\rho
+\]</p>
+<p>that equation is related to the evolution operator in real time, <span class="math">$e^{itH}$</span>. We can replace the inverse temperature with what we called the imaginary time</p>
+<p class="math">\[
+\beta = it
+\]</p>
 
 
 
@@ -906,7 +956,7 @@ probability that particle in the box in the position of x
           <div class="footer"><p>
           Published from <a href="intro_densityMatrix.jmd">intro_densityMatrix.jmd</a> using
           <a href="http://github.com/mpastell/Weave.jl">Weave.jl</a>
-           on 2019-12-01.
+           on 2019-12-03.
           <p></div>
 
 

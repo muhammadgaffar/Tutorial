@@ -313,3 +313,80 @@ legend();
 
 ![png](intro_densityMatrix_files/intro_densityMatrix_6_0.png)
 
+
+### Convolution relation
+
+Convolution relation or matrix squaring is practical approach to compute density matrix at any temperature, from high limit temperature.
+
+Hamiltonian of quantum system
+
+$$
+H = H_0 + V
+$$
+
+in the limit of high temperature the density matrix is expressed by Trotter formula
+$$
+\rho(x,x',\beta) \rightarrow \lim_{\beta\rightarrow 0} e^{-\frac{1}{2}\beta V(x)}\rho_0(x,x',\beta) e^{-\frac{1}{2}\beta V(x')}
+$$
+
+-------------------------------
+**Trotter Formula**
+
+In mathematics, Trotter formula or Lie product formula statess that
+
+$$
+e^{A+B} = \lim_{N\rightarrow \infty}(e^{A/N}e^{B/N})^N
+$$
+
+where $A$ and $B$ are arbitrary $n \times n$ real or complex matrices.
+
+Therefore, for hamiltonian above it gives
+
+$$
+e^{-\beta (H_0+V)} = \lim_{N\rightarrow \infty}(e^{-\beta/N H_0}e^{-\beta/N V})^N
+$$
+
+--------------------------------
+
+The elegant property is of density matrix is the convolution relation, where it relates the high temperature to their lower temperature
+
+$$
+\int dx' \; \rho(x,x',\beta_1)\rho(x',x'',\beta_2) = \int dx' \sum_{n,m} \psi_n(x) e^{-\beta_1 E_n} \psi_n^*(x') \psi_m(x') e^{-\beta_2 E_m}\psi_m^*(x'')  \\
+= \sum_{n,m}  \psi_n(x) e^{-\beta_1 E_n} \left(\int dx'\psi_n^*(x') \psi_m(x') \right) e^{-\beta_2 E_m}\psi_m^*(x'') = \sum_{n,m} \psi_n(x) e^{-\beta_1 E_n} \delta_{n,m} e^{-\beta_2 E_m}\psi_m^*(x'') \\
+= \sum_{n} \psi_n(x) e^{-(\beta_1+\beta_2) E_n}\psi_m^*(x'') = \rho(x,x'',\beta_1 + \beta_2)
+$$
+
+in matrix representation
+
+$$
+\sum_l \rho_{kl}(\beta_1) \rho_{lm}(\beta_2) = [\rho(\beta_1)\rho(\beta_2)]_{km} = \rho_{km}(\beta_1+\beta_2)
+$$
+
+this is the product of matrix.
+
+
+### Relation to statistical mechanics
+
+We can formulate the relation in term of differential relation
+
+$$
+\rho(\Delta\beta)\rho(\beta) = \rho(\beta + \Delta\beta)
+$$
+
+because $\rho(\Delta\beta) \approx 1 - \Delta\beta H$, then
+
+$$
+\rho(\beta + \Delta\beta) = \rho(\beta) - \Delta\beta H \rho(\beta)
+$$
+
+we arrived at the central equation of quantum statistical mechanics
+
+$$
+-H\rho = \frac{\rho(\beta + \Delta\beta) - \rho(\beta)}{\Delta\beta} = \frac{\partial}{\partial \beta}\rho
+$$
+
+that equation is related to the evolution operator in real time, $e^{itH}$. We can replace the inverse temperature with what we called the imaginary time
+
+$$
+\beta = it
+$$
