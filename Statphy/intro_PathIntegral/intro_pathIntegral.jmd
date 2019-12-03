@@ -177,3 +177,89 @@ legend();
 
 
 Path sampling above is local sampling, and it is slow (that's why called naive). A position $x_k$ cannot get far away from $x_{k-1}$ and $x_{k+1}$, thus the computed free density matrix is becomes very small. Local path sampling is unfit for complicated problems.
+
+#### B. Direct Sampling (Levy Sampling)
+
+To tackle the high rejection rate sampling in local sampling, we need to construct a free rejection sampling, one of the method is levy construction.
+
+First, to know the idea behind levy construction, let us sample the free density matrix
+
+$$
+\rho_0 (x_0,x_N,\beta) = \int \dots \int dx_1 \dots dx_{N-1} \; \rho_0(x_0,x_1,\Delta\tau)\rho_0(x_1,x_2,\Delta\tau)\dots \rho_0(x_{N-1},x_{N},\Delta\tau)
+$$
+
+we focus on $x_k$ that sandwhiched between $x'$ and $x''$ with two intervals $\Delta\tau'$ and $\Delta\tau''$, The distrituion of accepted moves is given by
+
+$$
+\pi_0 (x_k | x',x'') \propto \rho_0(x',x_k,\Delta\tau')\rho_0(x_k,x'',\Delta\tau'') 
+ \propto \exp\left(-\frac{x'^2-2x'x_k+x_k^2}{2\Delta\tau'} - \frac{x_k^2-2x_kx''+x''^2}{2\Delta\tau''}\right)
+$$
+
+dropping the terms that independent to $x_k$ (we just need to know the relation to $x_k$, we can do proportional)
+
+$$
+\pi_0 (x_k | x',x'') \propto \exp\left[-\left(\frac{-x'x_k+\frac{1}{2}x_k^2}{\Delta\tau'} + \frac{-x_kx''+\frac{1}{2}x_k^2}{\Delta\tau''}\right) \right] \propto \exp\left[-\left(\frac{x_k^2 (\Delta\tau' + \Delta\tau'')}{2\Delta\tau'\Delta\tau} - \frac{x_k(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau'\Delta\tau''}\right) \right]
+$$
+
+
+this is again simply gaussian if we look at this way
+
+$$
+\pi_0 (x_k | x',x'') \propto \exp\left[-\left(\frac{x_k^2 (\Delta\tau' + \Delta\tau'')}{2\Delta\tau'\Delta\tau} - \frac{x_k(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau'\Delta\tau''}\frac{\Delta\tau' + \Delta\tau''}{\Delta\tau' + \Delta\tau''}\right) \right]\\ 
+\propto \exp\left[-\left( x_k^2 \frac{1}{2}\left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right) - x_k\frac{(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau' + \Delta\tau''}\left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right) + C(x,x'') \right) \right]
+$$
+
+in simpler notation
+
+$$
+\pi_0 (x_k | x',x'') \propto \exp\left[ - \frac{(x_k - \langle x_k \rangle)^2}{2\sigma^2} \right]
+$$
+
+where 
+$$
+\langle x_k \rangle = \frac{\Delta\tau''x' + \Delta\tau'x''}{\Delta\tau' + \Delta\tau''} \quad \text{and} \quad \sigma^2 = \left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right)^{-1}
+$$
+
+Now what to do with this next? From expression above, instead accept or reject move, we just sample $x_k$ from the gaussian distribution, no rejection!
+
+
+```julia
+using Distributions
+
+"""
+Construct levy free density matrix
+"""
+function levy_free(x_bound,β,N)
+    Δτ = β / N
+    x = [x_bound[1]]
+    xN = x_bound[2]
+    for k in 2:N
+        Δτ_rel = (N - k) * Δτ
+        μ = (Δτ_rel * x[k-1] + Δτ * xN) / (Δτ_rel + Δτ)
+        σ2 = inv(Δτ_rel) + inv(Δτ)
+        σ2 = inv(σ2)
+        σ = sqrt(σ2)
+        gauss = Normal(μ,σ)
+        x_new = rand(gauss)
+        push!(x,x_new)
+    end
+    push!(x,xN)
+    return x
+end;
+```
+
+
+```julia
+x = levy_free([0.,0.3],4,10000)
+
+using PyPlot
+
+plt.figure(figsize=(3,9))
+plot(x,0:length(x)-1)
+ylim(0,length(x)-1)
+xlim(-2,2);
+```
+
+
+![png](intro_pathIntegral_files/intro_pathIntegral_8_0.png)
+

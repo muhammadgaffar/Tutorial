@@ -822,6 +822,79 @@ Markov chain monte carlo procedure
 
 <p><img src="intro_pathIntegral_files/intro_pathIntegral_4_0.png" alt="png" /></p>
 <p>Path sampling above is local sampling, and it is slow &#40;that&#39;s why called naive&#41;. A position <span class="math">$x_k$</span> cannot get far away from <span class="math">$x_{k-1}$</span> and <span class="math">$x_{k+1}$</span>, thus the computed free density matrix is becomes very small. Local path sampling is unfit for complicated problems.</p>
+<h4>B. Direct Sampling &#40;Levy Sampling&#41;</h4>
+<p>To tackle the high rejection rate sampling in local sampling, we need to construct a free rejection sampling, one of the method is levy construction.</p>
+<p>First, to know the idea behind levy construction, let us sample the free density matrix</p>
+<p class="math">\[
+\rho_0 (x_0,x_N,\beta) = \int \dots \int dx_1 \dots dx_{N-1} \; \rho_0(x_0,x_1,\Delta\tau)\rho_0(x_1,x_2,\Delta\tau)\dots \rho_0(x_{N-1},x_{N},\Delta\tau)
+\]</p>
+<p>we focus on <span class="math">$x_k$</span> that sandwhiched between <span class="math">$x'$</span> and <span class="math">$x''$</span> with two intervals <span class="math">$\Delta\tau'$</span> and <span class="math">$\Delta\tau''$</span>, The distrituion of accepted moves is given by</p>
+<p class="math">\[
+\pi_0 (x_k | x',x'') \propto \rho_0(x',x_k,\Delta\tau')\rho_0(x_k,x'',\Delta\tau'') 
+ \propto \exp\left(-\frac{x'^2-2x'x_k+x_k^2}{2\Delta\tau'} - \frac{x_k^2-2x_kx''+x''^2}{2\Delta\tau''}\right)
+\]</p>
+<p>dropping the terms that independent to <span class="math">$x_k$</span> &#40;we just need to know the relation to <span class="math">$x_k$</span>, we can do proportional&#41;</p>
+<p class="math">\[
+\pi_0 (x_k | x',x'') \propto \exp\left[-\left(\frac{-x'x_k+\frac{1}{2}x_k^2}{\Delta\tau'} + \frac{-x_kx''+\frac{1}{2}x_k^2}{\Delta\tau''}\right) \right] \propto \exp\left[-\left(\frac{x_k^2 (\Delta\tau' + \Delta\tau'')}{2\Delta\tau'\Delta\tau} - \frac{x_k(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau'\Delta\tau''}\right) \right]
+\]</p>
+<p>this is again simply gaussian if we look at this way</p>
+<p class="math">\[
+\pi_0 (x_k | x',x'') \propto \exp\left[-\left(\frac{x_k^2 (\Delta\tau' + \Delta\tau'')}{2\Delta\tau'\Delta\tau} - \frac{x_k(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau'\Delta\tau''}\frac{\Delta\tau' + \Delta\tau''}{\Delta\tau' + \Delta\tau''}\right) \right]\\ 
+\propto \exp\left[-\left( x_k^2 \frac{1}{2}\left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right) - x_k\frac{(x'\Delta\tau''+x''\Delta\tau')}{\Delta\tau' + \Delta\tau''}\left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right) + C(x,x'') \right) \right]
+\]</p>
+<p>in simpler notation</p>
+<p class="math">\[
+\pi_0 (x_k | x',x'') \propto \exp\left[ - \frac{(x_k - \langle x_k \rangle)^2}{2\sigma^2} \right]
+\]</p>
+<p>where </p>
+<p class="math">\[
+\langle x_k \rangle = \frac{\Delta\tau''x' + \Delta\tau'x''}{\Delta\tau' + \Delta\tau''} \quad \text{and} \quad \sigma^2 = \left(\frac{1}{\Delta\tau'} + \frac{1}{\Delta\tau''}\right)^{-1}
+\]</p>
+<p>Now what to do with this next? From expression above, instead accept or reject move, we just sample <span class="math">$x_k$</span> from the gaussian distribution, no rejection&#33;</p>
+
+
+<pre class='hljl'>
+<span class='hljl-k'>using</span><span class='hljl-t'> </span><span class='hljl-n'>Distributions</span><span class='hljl-t'>
+
+</span><span class='hljl-s'>&quot;&quot;&quot;
+Construct levy free density matrix
+&quot;&quot;&quot;</span><span class='hljl-t'>
+</span><span class='hljl-k'>function</span><span class='hljl-t'> </span><span class='hljl-nf'>levy_free</span><span class='hljl-p'>(</span><span class='hljl-n'>x_bound</span><span class='hljl-p'>,</span><span class='hljl-n'>β</span><span class='hljl-p'>,</span><span class='hljl-n'>N</span><span class='hljl-p'>)</span><span class='hljl-t'>
+    </span><span class='hljl-n'>Δτ</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-n'>β</span><span class='hljl-t'> </span><span class='hljl-oB'>/</span><span class='hljl-t'> </span><span class='hljl-n'>N</span><span class='hljl-t'>
+    </span><span class='hljl-n'>x</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-p'>[</span><span class='hljl-n'>x_bound</span><span class='hljl-p'>[</span><span class='hljl-ni'>1</span><span class='hljl-p'>]]</span><span class='hljl-t'>
+    </span><span class='hljl-n'>xN</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-n'>x_bound</span><span class='hljl-p'>[</span><span class='hljl-ni'>2</span><span class='hljl-p'>]</span><span class='hljl-t'>
+    </span><span class='hljl-k'>for</span><span class='hljl-t'> </span><span class='hljl-n'>k</span><span class='hljl-t'> </span><span class='hljl-kp'>in</span><span class='hljl-t'> </span><span class='hljl-ni'>2</span><span class='hljl-oB'>:</span><span class='hljl-n'>N</span><span class='hljl-t'>
+        </span><span class='hljl-n'>Δτ_rel</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-p'>(</span><span class='hljl-n'>N</span><span class='hljl-t'> </span><span class='hljl-oB'>-</span><span class='hljl-t'> </span><span class='hljl-n'>k</span><span class='hljl-p'>)</span><span class='hljl-t'> </span><span class='hljl-oB'>*</span><span class='hljl-t'> </span><span class='hljl-n'>Δτ</span><span class='hljl-t'>
+        </span><span class='hljl-n'>μ</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-p'>(</span><span class='hljl-n'>Δτ_rel</span><span class='hljl-t'> </span><span class='hljl-oB'>*</span><span class='hljl-t'> </span><span class='hljl-n'>x</span><span class='hljl-p'>[</span><span class='hljl-n'>k</span><span class='hljl-oB'>-</span><span class='hljl-ni'>1</span><span class='hljl-p'>]</span><span class='hljl-t'> </span><span class='hljl-oB'>+</span><span class='hljl-t'> </span><span class='hljl-n'>Δτ</span><span class='hljl-t'> </span><span class='hljl-oB'>*</span><span class='hljl-t'> </span><span class='hljl-n'>xN</span><span class='hljl-p'>)</span><span class='hljl-t'> </span><span class='hljl-oB'>/</span><span class='hljl-t'> </span><span class='hljl-p'>(</span><span class='hljl-n'>Δτ_rel</span><span class='hljl-t'> </span><span class='hljl-oB'>+</span><span class='hljl-t'> </span><span class='hljl-n'>Δτ</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-n'>σ2</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>inv</span><span class='hljl-p'>(</span><span class='hljl-n'>Δτ_rel</span><span class='hljl-p'>)</span><span class='hljl-t'> </span><span class='hljl-oB'>+</span><span class='hljl-t'> </span><span class='hljl-nf'>inv</span><span class='hljl-p'>(</span><span class='hljl-n'>Δτ</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-n'>σ2</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>inv</span><span class='hljl-p'>(</span><span class='hljl-n'>σ2</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-n'>σ</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>sqrt</span><span class='hljl-p'>(</span><span class='hljl-n'>σ2</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-n'>gauss</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>Normal</span><span class='hljl-p'>(</span><span class='hljl-n'>μ</span><span class='hljl-p'>,</span><span class='hljl-n'>σ</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-n'>x_new</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>rand</span><span class='hljl-p'>(</span><span class='hljl-n'>gauss</span><span class='hljl-p'>)</span><span class='hljl-t'>
+        </span><span class='hljl-nf'>push!</span><span class='hljl-p'>(</span><span class='hljl-n'>x</span><span class='hljl-p'>,</span><span class='hljl-n'>x_new</span><span class='hljl-p'>)</span><span class='hljl-t'>
+    </span><span class='hljl-k'>end</span><span class='hljl-t'>
+    </span><span class='hljl-nf'>push!</span><span class='hljl-p'>(</span><span class='hljl-n'>x</span><span class='hljl-p'>,</span><span class='hljl-n'>xN</span><span class='hljl-p'>)</span><span class='hljl-t'>
+    </span><span class='hljl-k'>return</span><span class='hljl-t'> </span><span class='hljl-n'>x</span><span class='hljl-t'>
+</span><span class='hljl-k'>end</span><span class='hljl-p'>;</span>
+</pre>
+
+
+
+
+<pre class='hljl'>
+<span class='hljl-n'>x</span><span class='hljl-t'> </span><span class='hljl-oB'>=</span><span class='hljl-t'> </span><span class='hljl-nf'>levy_free</span><span class='hljl-p'>([</span><span class='hljl-nfB'>0.</span><span class='hljl-p'>,</span><span class='hljl-nfB'>0.3</span><span class='hljl-p'>],</span><span class='hljl-ni'>4</span><span class='hljl-p'>,</span><span class='hljl-ni'>10000</span><span class='hljl-p'>)</span><span class='hljl-t'>
+
+</span><span class='hljl-k'>using</span><span class='hljl-t'> </span><span class='hljl-n'>PyPlot</span><span class='hljl-t'>
+
+</span><span class='hljl-n'>plt</span><span class='hljl-oB'>.</span><span class='hljl-nf'>figure</span><span class='hljl-p'>(</span><span class='hljl-n'>figsize</span><span class='hljl-oB'>=</span><span class='hljl-p'>(</span><span class='hljl-ni'>3</span><span class='hljl-p'>,</span><span class='hljl-ni'>9</span><span class='hljl-p'>))</span><span class='hljl-t'>
+</span><span class='hljl-nf'>plot</span><span class='hljl-p'>(</span><span class='hljl-n'>x</span><span class='hljl-p'>,</span><span class='hljl-ni'>0</span><span class='hljl-oB'>:</span><span class='hljl-nf'>length</span><span class='hljl-p'>(</span><span class='hljl-n'>x</span><span class='hljl-p'>)</span><span class='hljl-oB'>-</span><span class='hljl-ni'>1</span><span class='hljl-p'>)</span><span class='hljl-t'>
+</span><span class='hljl-nf'>ylim</span><span class='hljl-p'>(</span><span class='hljl-ni'>0</span><span class='hljl-p'>,</span><span class='hljl-nf'>length</span><span class='hljl-p'>(</span><span class='hljl-n'>x</span><span class='hljl-p'>)</span><span class='hljl-oB'>-</span><span class='hljl-ni'>1</span><span class='hljl-p'>)</span><span class='hljl-t'>
+</span><span class='hljl-nf'>xlim</span><span class='hljl-p'>(</span><span class='hljl-oB'>-</span><span class='hljl-ni'>2</span><span class='hljl-p'>,</span><span class='hljl-ni'>2</span><span class='hljl-p'>);</span>
+</pre>
+
+
+
+<p><img src="intro_pathIntegral_files/intro_pathIntegral_8_0.png" alt="png" /></p>
 
 
 
@@ -829,7 +902,7 @@ Markov chain monte carlo procedure
           <div class="footer"><p>
           Published from <a href="intro_pathIntegral.jmd">intro_pathIntegral.jmd</a> using
           <a href="http://github.com/mpastell/Weave.jl">Weave.jl</a>
-           on 2019-12-03.
+           on 2019-12-04.
           <p></div>
 
 
