@@ -1,0 +1,367 @@
+
+## DNN from Sctracth with Automatic Differentiation
+
+#### Muhammad Gaffar
+
+--------------------------------
+
+#### A. Using Zygote as Automatic Differentiation
+
+Zygote is automatic differentiation package from Julia Programming Language. Automatic differentiation will be used in backward calculation. We can easily compute the gradient of weights and biases from loss function $\mathcal{L}$ with simple function `gradient`.
+
+$$
+\partial \mathbf{W} \equiv \frac{\partial \mathcal{L}(\mathbf{W},\mathbf{b})}{\partial \mathbf{W}}
+$$
+
+where $\mathbf{W}$ and $\mathbf{b}$ is vector of weights and biases. This is vector gradient.
+
+please read "Mathematics for Machine Learning" by Marc Peter, et al.
+
+First, we load the `Zygote` package.
+
+
+```julia
+using Zygote: gradient
+```
+
+Now we are gonna using the infamous handwritten dataset, MNIST. We just load it from the Flux package.
+
+
+```julia
+# Now we load MNIST data from Flux Library
+using Flux.Data.MNIST
+imgs = MNIST.images();
+labels = MNIST.labels();
+
+#display the MNIST image from given index
+index = 754
+display(imgs[index])
+println("label = ", labels[index])
+```
+
+
+```julia
+#Let's see what is the images data is.
+
+display(float(imgs[index]));
+```
+
+
+```julia
+#And let's see the list of labels
+
+display(labels);
+```
+
+
+```julia
+#pre-processing data to fully-connected (vectors)
+X = hcat(vec.(float.(imgs))...)
+
+"""
+convert discretized labels to one_hot vectors 
+    (the vectors that contains bits information, where the index as unique labels)
+"""
+function one_hot(labels)
+    #number of data
+    N = length(labels)
+    
+    #number of unique labels
+    num = length(unique(labels))
+    
+    #initialize the one-hot vector
+    y = zeros(Int,num,N)
+    
+    #generate one-hot vectors from labels
+    for i in 1:N
+        y[:,i] = (labels[i] .== 0:9)
+    end
+    return y
+end
+
+y = one_hot(labels)
+
+#see the output y 
+display(y);
+```
+
+Now, we need to split the data to train and test data.
+
+Train data will be fed to our learning model, and test data will be used as benchmark / accuracy.
+It is convenient when splitting the data, the initial data must be shuffled.
+
+
+```julia
+#shuffle data and divide to test and train partition
+using Random
+
+"""
+shuffle data to test and train data, where the ratio is given by train_perc
+    
+    train_prec = ration of train/test
+"""
+function partitionTrainTest(features, labels, train_perc = 0.7)
+    at = train_perc
+    N = size(features,2)
+    idx = shuffle(1:N)
+    train_idx = view(idx, 1:floor(Int, at*N))
+    test_idx = view(idx, (floor(Int, at*N)+1):N)
+    features[:,train_idx,], labels[:,train_idx], features[:,test_idx], labels[:,test_idx]
+end
+
+X_tr, y_tr, X_ts, y_ts = partitionTrainTest(X, y, 2/3);
+
+#See the final size of splitting data (train and test)
+
+@show size(X_tr,2);
+@show size(X_ts,2);
+```
+
+
+```julia
+# Construct struct for model parameters
+# for simple dense neural network, the model just consist of weights and biases
+
+"""
+model object, where it contains W and b
+"""
+mutable struct model
+    W 
+    b
+end;
+
+"""
+parameters (weights and biases) initialization of given total layer with normal random
+"""
+function init_params(layer_dims) 
+    #initialize empty model
+    nn_model = model([],[]) 
+    
+    #initialize parameters in every layer
+    for i in 1:length(layer_dims)-1
+        
+        #the dimension of weights, W[L,L+1]
+        W = randn(layer_dims[i],layer_dims[i+1]) .* 0.01
+        push!(nn_model.W,W)
+        
+        #dimension of biases, b[L]
+        b = zeros(layer_dims[i+1],1)
+        push!(nn_model.b,b)
+        
+    end
+    return nn_model
+end
+
+#now we construct number of layer, "0" for input, "1,2,3,..." for hidden layer
+L0 = size(X,1)
+L1 = 200
+L2 = 80
+L3 = size(y,1)
+
+layer = [L0,L1,L2,L3]
+parameters = init_params(layer);
+
+#example, we see weights of layer 2
+display(parameters.W[2]);
+```
+
+
+```julia
+# the activation function
+function sigmoid(Z)
+    A = 1.0 / (1.0 + exp.(-Z))
+end
+
+function relu(Z)
+    return Z * (Z > 0)
+end;
+
+
+"""
+Forward propagation of the model
+"""
+function forward(model,X)
+    # number of layers
+    L = Int(length(model.W))
+    
+    # forward propagation RELU -> [ RELU ] -> SIGMOID
+    Z = relu.(model.W[1]' * X .+ model.b[1])
+    for i in 2:L-1
+        Z = relu.(model.W[i]' * Z .+ model.b[i])
+    end
+    y_pred = sigmoid.(model.W[L]' * Z .+ model.b[L])
+    
+    return y_pred
+end;
+
+#example, predicting the output of training data from given parameter models.
+y_out = forward(parameters,X_tr)
+
+display(y_out);
+```
+
+Of course it still cannot recognize the what is 1, 2, 3 from the data. Then we need to train the data, this is the works of backpropagation or gradient-works.
+
+We define the loss function, the function that will be using as the metrics of errorness. The model will learn (taking the gradient of parameters from his mistakes), and using the gradient to optimize the parameters.
+
+The loss function we use is L2 norm loss
+
+$$
+\text{loss} = \frac{1}{N} \sum_i (\hat{y}_i - y_i)^2
+$$
+
+
+```julia
+"""
+compute forward and then compute Loss function. L2 norm Loss is used
+"""
+function forward_loss(params,X,y)
+    N = size(X,2)
+    y_pred = forward(params,X)
+    loss   = sum((y_pred - y).^2) ./ N
+    return loss
+end;
+
+#compute loss for given model, test for 200 data
+loss = forward_loss(parameters,X_tr[:,200],y_tr[:,200])
+
+display(loss);
+```
+
+Now we test how to compute gradient $\partial \mathbf{W}$ with zygote.
+
+
+```julia
+#test automatic differentiation with zygote for 1000 data
+dp = gradient(parameters) do m
+        forward_loss(m,X_tr[:,1000],y_tr[:,1000])
+    end[1][]
+
+#see the gradient of weight in layer 3
+display(dp.W[3]);
+```
+
+**Now we train the model**
+
+1. batch the data
+2. train every batch. this is called 1 epoch
+3. train for reasonable epochs
+
+**the training procedure is**
+
+1. do forward propagation
+2. compute loss
+3. compute the gradient
+4. update parameters
+
+    W = W - $\eta$ dW
+    
+    b = b - $\eta$ db
+    
+   where $\eta$ is the learning rate
+
+
+```julia
+#now we train our model
+η = 0.9
+L = length(parameters.W)
+
+#track our losses over iteration
+losses = []
+
+for epoch in 1:20, i in 1:40
+
+        idx = (1 + 1000*(i-1)):1000*i
+
+        #forward propagation and compute loss
+        loss = forward_loss(parameters,X_tr[:,idx],y_tr[:,idx])
+
+        #automatic differentiation
+        dparams = gradient(parameters) do m
+            return forward_loss(m,X_tr[:,idx],y_tr[:,idx])
+        end
+
+        dparams = dparams[1][]
+
+        #update the parameters
+        parameters.W .-= η .* dparams.W
+        parameters.b .-= η .* dparams.b
+
+        #print the progress
+        if i % 20 == 0
+            append!(losses,loss)
+            println("For epoch ", epoch, " [ ", 1000*i, "/40000 ] | Loss = ", loss)
+        end
+    
+end;
+```
+
+
+```julia
+# now we plot the loss
+
+using Plots
+gr()
+
+plot(losses)
+```
+
+
+```julia
+#Let's see the accuracy for test data
+
+"""
+convert back the one-hot vectors, one-cold vectors
+"""
+function one_cold(one_hot_vectors)
+    N = size(y_ts,2)
+    
+    #initialize one_cold_vectors
+    labels = zeros(Int,N)
+    
+    for i in 1:N
+        #index with maximum probability, -1 comes from the fact the labels are 0:9
+        predicted = findmax(one_hot_vectors[:,i],dims=1)[2][1] - 1
+        labels[i] = predicted
+    end
+    return labels
+end
+
+"""
+check accuracy by comparing to the ground truth
+"""
+function accuracy(predicted,truth)
+    N = length(predicted)
+    acc = predicted .== truth
+    return sum(acc) / N    
+end
+
+#predicted labels
+y_pred_ts = forward(parameters,X_ts)
+
+#convert to one_cold
+predicted = one_cold(y_pred_ts)
+truth = one_cold(y_ts)
+
+#the accuracy
+acc = accuracy(predicted,truth)
+
+println("Accuracy for test data = ", acc)
+```
+
+
+```julia
+#predicted labels
+y_pred_tr = forward(parameters,X_tr)
+
+#convert to one_cold
+predicted = one_cold(y_pred_tr)
+truth = one_cold(y_tr)
+
+#the accuracy
+acc = accuracy(predicted,truth)
+
+println("Accuracy for train data = ", acc)
+```
+
+We see that just fromm simple 3 dense layer, without overparameterized model can do so well.
