@@ -1,4 +1,3 @@
-
 ## Intro to Path Integral
 
 #### Muhammad Gaffar
@@ -124,27 +123,25 @@ end;
 
 
 ```julia
-using PyPlot
+using Plots
+
+p = plot(framestyle=:box,size=(400,500))
+xlims!(p,-2,2)
 
 x = zeros(9)
-plt.figure(figsize=(4,5))
-plt.plot(x,0:length(x)-1,"-o",label = "iter = 0")
+plot!(p,x,0:length(x)-1,marker=:circle,label = "iter = 0")
 
 β = 4
 N = 8
-for i in 1:6
+for i in 1:10
     global x
     hist,x = naive_harmonic(β,N,1,x_in=x)
-    plt.plot(x,0:length(x)-1,"-o",label = "iter = $i")
-    xlim(-2,2)
-    ylim(0,length(x)-1)
+    plot!(p,x,0:length(x)-1,marker=:circle,label = "iter = $i")
+    xlims!(p,(-2,2))
+    ylims!(p,(0,length(x)-1))
 end
-legend();
+p
 ```
-
-
-![png](intro_pathIntegral_files/intro_pathIntegral_2_0.png)
-
 
 We compare the monte carlo result with exact result
 
@@ -152,29 +149,25 @@ We compare the monte carlo result with exact result
 ```julia
 using NumericalIntegration
 
+#exact diagonal density matrix harmonic
 β = 4
-
-fig,ax = plt.subplots(figsize=(6,6))
-#exact result
 x_path = LinRange(-3,3,100)
 y = ρ_diag_harmonic.(x_path,β)
 norm = integrate(x_path,y)
 y ./= norm
-ax.plot(x_path,y,label="Exact")
 
-#quantum monte carlo
-N = 8
+#using monte carlo
+N = 10
 hst,x = naive_harmonic(β,N,1e6);
-ax.hist(hst,bins=75,density=true,histtype="step",range=(-3,3),label="Monte Carlo");
 
-ax.set_ylabel(L"\pi(x)",fontsize=15)
-ax.set_xlabel(L"x",fontsize=15)
-legend();
+#plot
+p = plot(size=(500,400))
+plot!(p,x,hst,seriestype=:stephist,normalize=true,label="montecarlo")
+plot!(p,x_path,y,label="exact")
+ylims!(p,0,0.7)
+ylabel!(p,"\\pi (x)")
+xlabel!(p,"x")
 ```
-
-
-![png](intro_pathIntegral_files/intro_pathIntegral_4_0.png)
-
 
 Path sampling above is local sampling, and it is slow (that's why called naive). A position $x_k$ cannot get far away from $x_{k-1}$ and $x_{k+1}$, thus the computed free density matrix is becomes very small. Local path sampling is unfit for complicated problems.
 
@@ -250,16 +243,178 @@ end;
 
 
 ```julia
-x = levy_free([0.,0.3],4,10000)
+#plot path
+β = 4
+N = 10_000
+x = levy_free([0.,0.],β,N);
 
-using PyPlot
-
-plt.figure(figsize=(3,9))
-plot(x,0:length(x)-1)
-ylim(0,length(x)-1)
-xlim(-2,2);
+p = plot(framestyle=:box,size=(300,400))
+plot!(p,x,0:length(x)-1,label="")
+yticks!(p,[0,N],["0","\\beta"])
+ylims!(p,0,length(x)-1)
+xlims!(p,-2,2)
+ylabel!(p,"\\tau")
+xlabel!(p,"x")
 ```
 
+### Fourier Space
 
-![png](intro_pathIntegral_files/intro_pathIntegral_8_0.png)
+#### Continous Path
 
+By analyzing the geometry of the path, we can develop new algorithm of path integral based on its fourier transform. For simplification, we consider $x(0) = x(\beta) = 0$.
+Other path $x(\tau)$ can be decomposed as set of sine function,
+
+$$
+x(\tau) = \sum_{n=1}^\infty c_n \sin \left(n\pi \frac{\tau}{\beta}\right); \quad \tau \in [0,\beta]
+$$
+
+we can get the fourier coefficient $c_l$ from orthonormality relation, hence by multiply the equation above with $ \sin \left(l\pi \frac{\tau}{\beta}\right)$ and integrate it
+
+$$
+\frac{2}{\beta} \int_0^\beta d\tau \sin \left(l\pi\frac{\tau}{\beta}\right) x(\tau) = \frac{2}{\beta}\sum_{n=1}^\infty c_n \int_0^\beta d\tau \sin \left(l\pi\frac{\tau}{\beta} \right) \sin \left(n\pi\frac{\tau}{\beta}\right) = c_l 
+$$
+
+We now express the statistical weight of the path directly in fourier variables,
+
+$$
+\exp(-\mathcal{S}(x_0,x_1,...,x_N) = \rho_0(x_0,x_1,\Delta\tau)\rho_0(x_1,x_2,\Delta\tau)\dots\rho_0(x_{N-1},x_N,\Delta\tau)
+$$
+
+for small $\Delta\tau$, in this limit the action becomes
+
+$$
+\mathcal{S} = \frac{1}{2} \int_0^\beta d\tau \left[\frac{\partial x(\tau)}{\partial \tau}\right]^2 = \frac{1}{2} \sum_{n=1}^\infty c^2_n\frac{n^2\pi^2}{\beta^2}\int_0^\beta d\tau \cos^2\left(n\pi\frac{\tau}{\beta}\right) = \frac{1}{\beta}\sum_{n=1}^\infty \frac{c_n^2n^2\pi^2}{4}
+$$
+
+the statistical weight of the path
+
+$$
+\exp(-\mathcal{S}) = \exp\left( - \frac{1}{\beta}\sum_{n=1}^\infty \frac{c_n^2n^2\pi^2}{4} \right)
+$$
+
+thus free density matrix is an infinite product of integrals
+
+$$
+\rho_0(0,0,\beta) \propto \prod_{n=1}^\infty \left[ \int_{-\infty}^\infty \frac{dc_n n\pi }{\sqrt{4\pi \beta}} \exp\left(-\frac{1}{\beta}\sum_{n=1}^\infty c_n^2\frac{n^2\pi^2}{4}\right)\right]
+$$
+
+#### Discrete path
+A discrete path can be represented as finite mode of fourier transform:
+
+$$
+x_k = \sum_{n=1}^{N-1} c_n\sin\left(n\pi \frac{k}{N}\right); \quad k=0,\dots,N
+$$
+
+the action $\mathcal{S}$ is (by taking $\Delta\tau$ as discrete)
+
+$$
+\exp\left[-\mathcal{S}\right] = \exp\left[\sum_{k=1}^N\frac{(x_k - x_{k-1})^2}{2\Delta\tau}\right]
+$$
+
+because of orthogonility, term $n \neq l$ vanish, and we end up with
+
+$$
+\mathcal{S} = \frac{1}{2\Delta\tau}\sum_{j=1}^{N=1}c_j^2\sum_{k=1}^N\left[\sin\left(j\pi\frac{k}{N}\right)-\sin\left(j\pi\frac{k-1}{N}\right)\right]^2 \\ 
+= \frac{2}{\Delta\tau}\sum_{n=1}^{N-1}c_n^2\sin^2\left(\frac{n\pi}{2N}\right)\sum_{k=1}^N \cos^2\left[\frac{n\pi}{N}\left(k-\frac{1}{2}\right)\right] = -\frac{N}{\Delta\tau} \sum_{n=1}^{N-1}c_n^2\sin^2\left(\frac{n\pi}{2N}\right)
+$$
+
+writing weight as gaussian
+
+$$
+\exp(\mathcal{S}) = \exp\left(-\frac{c_1^2}{2\sigma_1^2}\right) \dots \exp\left(-\frac{c_{N-1}^2}{2\sigma_{N-1}^2}\right); \quad \sigma_n^2 = \frac{\beta}{2N^2\sin^2\left(\frac{n\pi}{2N}\right)} \approx \frac{2\beta}{\pi^2n^2} + \dots
+$$
+
+the path integral representation is purely independent in fourier transform
+
+$$
+\rho_0(0,0,\beta) = \prod_{i=1}^{N-1} \int_{-\infty}^\infty \frac{dc_i}{\sqrt{2\pi}\sigma_i}\exp\left(-\frac{c_i^2}{2\sigma_i^2}\right)
+$$
+
+now let's sampling using fourier path integral
+
+
+```julia
+"""
+fourier free path
+
+Sampling a path contributing to ρ_0 (0,0,β) in fourier space, and then transforming it to real variable.
+
+Step:
+# for every fourier mode n ∈ [1,N-1], sample fourier coeff
+for i in 1:N-1
+    1. calculate standard deviation, σ
+    2. sample fourier coeff, c_i, from gaussian with σ
+# transform fourier to real space, {c_1,...,c_N} → {x_1,...,x_k}
+for k in 0:N
+    1. calculate x_k from fourier coeff
+
+return: {x_1,...,x_k}
+"""
+function fourier_free_path(β,N)
+    σ = zeros(Float64,N-1)
+    c = zeros(Float64,N-1)
+    for i in 1:N-1
+        σ[i] = 2N^2 * sin(i*π/(2N))^2
+        gauss = Normal(0,sqrt(β/σ[i]))
+        c[i] = rand(gauss)
+    end
+    x = zeros(Float64,N+1)
+    for k in 0:N
+        ns = LinRange(1,N-1,N-1)
+        s = sin.(ns .* π*k/N)
+        x[k+1] = sum(c .* s)
+    end
+    x[end] = x[1]
+    return x
+end
+
+β = 4
+N = 10_000
+x = fourier_free_path(β,N)
+
+using Plots
+p = plot(framestyle=:box,size=(300,400))
+plot!(p,x,0:length(x)-1)
+yticks!(p,[0,N],["0","\\beta"])
+ylims!(p,0,length(x)-1)
+xlims!(p,(-4,4))
+ylabel!(p,"\\tau")
+xlabel!(p,"x")
+```
+
+Fourier transform decouples the real-action because of the latter is invariant under translation. In many other systems, simulations can be difficult within a set of coordinate, and much easier after a coordinate transformations, because the variables might be less coupled.
+
+### Correlation Function
+
+We now determine all path correlation $\left\langle x_k x_l \right\rangle$ from path integral action. Using $\Delta\tau = 1$, so that $N = \beta$, the action is
+
+$$
+\mathcal{S} = \frac{1}{2}[(x_1 - x_0)^2 + \dots + (x_N - x_{N-1})^2]
+$$
+
+this action/weight can be represented as matrix
+
+$$
+\exp(-\mathcal{S}) = \exp\left(-\frac{1}{2} \sum_{k,l=1}^{N-1} x_k \mathcal{M}_{kl} x_l \right)
+$$
+
+where
+
+$$
+\mathcal{M} = \begin{bmatrix}
+2 & -1 & \cdot & \cdot & \cdot & \cdot & \cdot \\
+-1 & 2  & -1 & \cdot & \cdot & \cdot & \cdot \\
+\cdot & -1 & 2  & -1 & \cdot & \cdot & \cdot \\
+\cdot & \cdot & -1 & 2  & -1 & \cdot & \cdot \\
+\cdot & \cdot & \cdot & -1 & 2  & -1 & \cdot \\
+\cdot & \cdot & \cdot & \cdot & -1 & 2  & -1 \\
+\cdot & \cdot & \cdot & \cdot & \cdot & -1 & 2 \\
+\end{bmatrix}
+$$
+
+the correlation function is given by
+$$
+\left\langle x_k x_l \right\rangle = \frac{\int dx_1 \dots dx_{N-1} x_k x_l \exp\left(-\frac{1}{2} \sum x_n \mathcal{M}_{nm} x_m \right)}{\int dx_1 \dots dx_{N-1} \exp\left(-\frac{1}{2} \sum x_n \mathcal{M}_{nm} x_m \right)} = (\mathcal{M}^{-1})_{kl} 
+$$
+
+where it is simply a inverse of matrix $\mathcal{M}$
